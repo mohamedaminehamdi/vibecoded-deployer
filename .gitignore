@@ -1,0 +1,51 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+terraform.tfvars
+*.tfvars
+*.tfvars.json
+
+# Terraform backend config. The deploy and destroy workflows generate this file
+# at run time, and a hand-written copy may contain account-specific values.
+terraform/backend.tf
+terraform/*/backend.tf
+
+# Bootstrap state stays local (migrating it to the backend it creates would be circular)
+terraform/bootstrap/.terraform/
+terraform/bootstrap/*.tfstate
+terraform/bootstrap/*.tfstate.*
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Checkout of the Lovable app that the deploy workflow creates (if you reproduce it locally)
+lovable-app/
+
+# Node (only relevant if you build an app next to this repo)
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

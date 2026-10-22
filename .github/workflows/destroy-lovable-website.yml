@@ -1,0 +1,295 @@
+name: Destroy Lovable Website
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_name:
+        description: "Repo name used when the site was deployed (selects the Terraform state to destroy)"
+        required: true
+        type: string
+      domain_name:
+        description: "Root domain, e.g. example.com"
+        required: true
+        type: string
+      subdomain:
+        description: "Subdomain, e.g. my-site"
+        required: true
+        type: string
+      confirm_destroy:
+        description: "Type 'DESTROY' to confirm deletion (case sensitive)"
+        required: true
+        type: string
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    if: inputs.confirm_destroy == 'DESTROY'
+
+    steps:
+    - name: Checkout deployer repo
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_wrapper: false
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+
+    - name: Configure Terraform Backend for Project
+      working-directory: terraform
+      run: |
+        # Create backend configuration with project-specific state key
+        cat > backend.tf <<EOF
+        terraform {
+          backend "s3" {
+            bucket       = "${{ secrets.TERRAFORM_STATE_BUCKET || 'lovable-deployer-terraform-state' }}"
+            key          = "projects/${{ inputs.repo_name }}/terraform.tfstate"
+            region       = "us-west-2"
+            encrypt      = true
+            use_lockfile = true
+          }
+        }
+        EOF
+        cat backend.tf
+
+    - name: Terraform Init
+      working-directory: terraform
+      run: terraform init -reconfigure
+
+    - name: Check if State Exists
+      working-directory: terraform
+      id: check-state
+      run: |
+        if terraform state list 2>/dev/null | grep -q .; then
+          echo "state_exists=true" >> $GITHUB_OUTPUT
+          echo "State found for project: ${{ inputs.repo_name }}"
+        else
+          echo "state_exists=false" >> $GITHUB_OUTPUT
+          echo "No state found for project: ${{ inputs.repo_name }}"
+          echo "Project may not exist or state may have been deleted already"
+        fi
+
+    - name: Get Resources from State
+      if: steps.check-state.outputs.state_exists == 'true'
+      working-directory: terraform
+      id: get-resources
+      run: |
+        # Extract resource information using terraform output (cleaner than state show)
+        # Write to temp files first to avoid any stdout pollution
+        terraform output -raw bucket_name 2>/dev/null > /tmp/bucket_name.txt || echo "" > /tmp/bucket_name.txt
+        terraform output -raw cloudfront_distribution_id 2>/dev/null > /tmp/cloudfront_id.txt || echo "" > /tmp/cloudfront_id.txt
+        terraform output -raw certificate_arn 2>/dev/null > /tmp/cert_arn.txt || echo "" > /tmp/cert_arn.txt
+        
+        BUCKET_NAME=$(cat /tmp/bucket_name.txt)
+        CLOUDFRONT_ID=$(cat /tmp/cloudfront_id.txt)
+        CERT_ARN=$(cat /tmp/cert_arn.txt)
+        
+        # Write to GITHUB_OUTPUT using heredoc to avoid any format issues
+        {
+          echo "bucket_name=$BUCKET_NAME"
+          echo "cloudfront_id=$CLOUDFRONT_ID"
+          echo "certificate_arn=$CERT_ARN"
+        } >> $GITHUB_OUTPUT
+        
+        echo "Resources to destroy:"
+        echo "  S3 Bucket: $BUCKET_NAME"
+        echo "  CloudFront: $CLOUDFRONT_ID"
+        echo "  ACM Certificate: $CERT_ARN"
+
+    - name: Empty S3 Bucket Before Destroy
+      if: steps.check-state.outputs.state_exists == 'true' && steps.get-resources.outputs.bucket_name != ''
+      run: |
+        BUCKET="${{ steps.get-resources.outputs.bucket_name }}"
+        echo "Emptying S3 bucket: $BUCKET"
+        
+        # Delete all objects and versions
+        aws s3api list-object-versions \
+          --bucket "$BUCKET" \
+          --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
+          --output json > /tmp/versions.json || echo '{"Objects":[]}' > /tmp/versions.json
+        
+        if [ "$(cat /tmp/versions.json | jq '.Objects | length')" -gt 0 ]; then
+          aws s3api delete-objects \
+            --bucket "$BUCKET" \
+            --delete file:///tmp/versions.json || true
+        fi
+        
+        # Delete delete markers
+        aws s3api list-object-versions \
+          --bucket "$BUCKET" \
+          --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
+          --output json > /tmp/markers.json || echo '{"Objects":[]}' > /tmp/markers.json
+        
+        if [ "$(cat /tmp/markers.json | jq '.Objects | length')" -gt 0 ]; then
+          aws s3api delete-objects \
+            --bucket "$BUCKET" \
+            --delete file:///tmp/markers.json || true
+        fi
+        
+        echo "S3 bucket emptied successfully"
+
+    - name: Terraform Destroy
+      if: steps.check-state.outputs.state_exists == 'true'
+      working-directory: terraform
+      run: |
+        terraform destroy -auto-approve \
+          -var="bucket_name=${{ inputs.subdomain }}.${{ inputs.domain_name }}" \
+          -var="domain_name=${{ inputs.domain_name }}" \
+          -var="subdomain=${{ inputs.subdomain }}" \
+          -var="route53_hosted_zone_id="
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: us-west-2
+
+    - name: Cleanup CloudFront Distribution (if still exists)
+      if: steps.get-resources.outputs.cloudfront_id != ''
+      continue-on-error: true
+      run: |
+        DIST_ID="${{ steps.get-resources.outputs.cloudfront_id }}"
+        echo "Checking CloudFront distribution: $DIST_ID"
+        
+        # Check if distribution exists
+        STATUS=$(aws cloudfront get-distribution --id "$DIST_ID" --query 'Distribution.Status' --output text 2>/dev/null || echo "NOT_FOUND")
+        
+        if [ "$STATUS" != "NOT_FOUND" ] && [ "$STATUS" != "Deployed" ]; then
+          echo "Distribution is being disabled, waiting..."
+          aws cloudfront wait distribution-deployed --id "$DIST_ID" || true
+        fi
+
+    - name: Cleanup ACM Certificate (if still exists)
+      if: steps.get-resources.outputs.certificate_arn != ''
+      continue-on-error: true
+      run: |
+        CERT_ARN="${{ steps.get-resources.outputs.certificate_arn }}"
+        echo "Attempting to delete ACM certificate: $CERT_ARN"
+        
+        # ACM certificates can only be deleted if not in use
+        # CloudFront must be deleted first, which we did above
+        aws acm delete-certificate \
+          --certificate-arn "$CERT_ARN" \
+          --region us-east-1 || echo "Certificate may already be deleted or still in use"
+
+    - name: Delete Route 53 DNS Record
+      continue-on-error: true
+      run: |
+        FQDN="${{ inputs.subdomain }}.${{ inputs.domain_name }}"
+        echo "Attempting to delete Route 53 record for: $FQDN"
+        
+        # Find the hosted zone ID
+        ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+          --dns-name "${{ inputs.domain_name }}" \
+          --query "HostedZones[?Name=='${{ inputs.domain_name }}.'].Id" \
+          --output text | cut -d'/' -f3)
+        
+        if [ -z "$ZONE_ID" ]; then
+          echo "No Route 53 hosted zone found for ${{ inputs.domain_name }}"
+          echo "DNS record may be managed by GoDaddy or another provider"
+          exit 0
+        fi
+        
+        echo "Found hosted zone: $ZONE_ID"
+        
+        # Get the current record details (value and TTL) - must match exactly for DELETE
+        RECORD_JSON=$(aws route53 list-resource-record-sets \
+          --hosted-zone-id "$ZONE_ID" \
+          --query "ResourceRecordSets[?Name=='${FQDN}.' && Type=='CNAME']" \
+          --output json 2>/dev/null || echo "[]")
+        
+        RECORD_VALUE=$(echo "$RECORD_JSON" | jq -r '.[0].ResourceRecords[0].Value // empty')
+        RECORD_TTL=$(echo "$RECORD_JSON" | jq -r '.[0].TTL // empty')
+        
+        if [ -z "$RECORD_VALUE" ]; then
+          echo "No CNAME record found for $FQDN"
+          exit 0
+        fi
+        
+        echo "Found record pointing to: $RECORD_VALUE (TTL: $RECORD_TTL)"
+        
+        # Delete the CNAME record - TTL must match exactly
+        CHANGE_BATCH=$(cat <<EOF
+        {
+          "Changes": [{
+            "Action": "DELETE",
+            "ResourceRecordSet": {
+              "Name": "${FQDN}",
+              "Type": "CNAME",
+              "TTL": ${RECORD_TTL},
+              "ResourceRecords": [{"Value": "${RECORD_VALUE}"}]
+            }
+          }]
+        }
+        EOF
+        )
+        
+        aws route53 change-resource-record-sets \
+          --hosted-zone-id "$ZONE_ID" \
+          --change-batch "$CHANGE_BATCH"
+        
+        echo "✅ Deleted Route 53 CNAME record for $FQDN"
+
+    - name: Delete GoDaddy DNS Record
+      continue-on-error: true
+      env:
+        GODADDY_API_KEY: ${{ secrets.GODADDY_API_KEY }}
+        GODADDY_API_SECRET: ${{ secrets.GODADDY_API_SECRET }}
+      run: |
+        if [ -z "$GODADDY_API_KEY" ]; then
+          echo "GoDaddy API key not configured, skipping GoDaddy DNS cleanup"
+          exit 0
+        fi
+        
+        echo "Attempting to delete GoDaddy record for: ${{ inputs.subdomain }}.${{ inputs.domain_name }}"
+        
+        # Delete the CNAME record from GoDaddy
+        curl -X DELETE "https://api.godaddy.com/v1/domains/${{ inputs.domain_name }}/records/CNAME/${{ inputs.subdomain }}" \
+          -H "Authorization: sso-key ${GODADDY_API_KEY}:${GODADDY_API_SECRET}" \
+          -H "Content-Type: application/json" || echo "GoDaddy record may not exist or deletion failed"
+        
+        echo "✅ Attempted to delete GoDaddy CNAME record"
+
+    - name: Delete State File from S3
+      if: steps.check-state.outputs.state_exists == 'true'
+      continue-on-error: true
+      run: |
+        STATE_BUCKET="${{ secrets.TERRAFORM_STATE_BUCKET || 'lovable-deployer-terraform-state' }}"
+        STATE_KEY="projects/${{ inputs.repo_name }}/terraform.tfstate"
+        
+        echo "Deleting state file: s3://$STATE_BUCKET/$STATE_KEY"
+        aws s3 rm "s3://$STATE_BUCKET/$STATE_KEY" || echo "State file may already be deleted"
+        
+        # Also delete any backup state files
+        aws s3 rm "s3://$STATE_BUCKET/$STATE_KEY.backup" || true
+
+    - name: Summary
+      run: |
+        echo "## Destruction Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.check-state.outputs.state_exists }}" == "true" ]; then
+          echo "✅ Project **${{ inputs.repo_name }}** has been destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Resources removed:**" >> $GITHUB_STEP_SUMMARY
+          echo "- S3 Bucket" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront Distribution" >> $GITHUB_STEP_SUMMARY
+          echo "- ACM Certificate" >> $GITHUB_STEP_SUMMARY
+          echo "- Route 53 DNS Record (if exists)" >> $GITHUB_STEP_SUMMARY
+          echo "- GoDaddy DNS Record (if exists)" >> $GITHUB_STEP_SUMMARY
+          echo "- Terraform State File" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "ℹ️ No state found for project **${{ inputs.repo_name }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Possible reasons:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Project was never deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- Project was already destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "- Incorrect repository name provided" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No resources were removed as no state was found." >> $GITHUB_STEP_SUMMARY
+        fi
+

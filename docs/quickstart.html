@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quickstart · vibecoded-deployer</title>
+  <meta name="description" content="Fork the repository, create the Terraform state bucket, add secrets and run your first deployment.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("ld-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}</script>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M16 21V10m0 0-5 5m5-5 5 5M9.5 25h13" fill="none" stroke="var(--accent-contrast)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>vibecoded-deployer</span></a>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+          <a href="quickstart.html" aria-current="page">Quickstart</a>
+          <a href="architecture.html">Architecture</a>
+          <a href="reference.html">Reference</a>
+          <a href="dns.html">DNS</a>
+          <a href="teardown.html">Teardown</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="Dark mode" aria-pressed="false"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/mohamedaminehamdi/vibecoded-deployer" aria-label="vibecoded-deployer on GitHub"><svg class="filled" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <button class="icon-btn menu-btn" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      </div>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container doc">
+      <div class="toc-col"><nav class="toc" aria-labelledby="toc-title"><p class="toc-title" id="toc-title">On this page</p><ul>
+<li><a href="#prerequisites">Before you start</a></li>
+<li><a href="#steps">Steps</a></li>
+<li><a href="#first-run">What happens on a first run</a></li>
+<li><a href="#next">Next steps</a></li>
+</ul></nav></div>
+      <article class="doc-main">
+        <h1>Quickstart</h1>
+        <p class="page-lede">From a fresh fork to a live HTTPS site. Allow about ten minutes of your time, plus a few minutes of AWS waiting.</p>
+        <h2 id="prerequisites">Before you start<a class="anchor" href="#prerequisites" aria-label="Link to this section">#</a></h2>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Prerequisites (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Prerequisites</caption>
+          <thead><tr><th scope="col">You need</th><th scope="col">Why</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">An AWS account and an IAM user with access keys</th><td>The workflows sign in with <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> secrets. See <a href="reference.html#permissions">AWS permissions</a>.</td></tr>
+            <tr><th scope="row">A domain with DNS hosted in Route 53 or GoDaddy</th><td>The workflow creates the CNAME <code>&lt;subdomain&gt;.&lt;domain&gt;</code>. See <a href="dns.html">DNS</a>.</td></tr>
+            <tr><th scope="row">One GitHub account or organization that owns both this repository and your Lovable repository</th><td>The Lovable repository is checked out from <code>&lt;owner of this repo&gt;/&lt;repo_name&gt;</code>. A private Lovable repo also needs the optional <code>ACCESS_GITHUB_TOKEN</code> secret.</td></tr>
+            <tr><th scope="row">A Lovable repository that builds with <code>npm ci</code> and <code>npm run build</code></th><td>Commit <code>package-lock.json</code>, keep a <code>build</code> script, and make sure the output lands in <code>out/</code>, <code>build/</code> or <code>dist/</code>.</td></tr>
+            <tr><th scope="row">Terraform 1.3 or newer and AWS credentials on your machine</th><td>Only for the one-time state bucket bootstrap. The workflows install their own Terraform.</td></tr>
+          </tbody>
+        </table></div>
+        <div class="callout note">
+          <p class="callout-title">Costs</p>
+          <p>You pay AWS for what the workflow creates: S3 storage and requests, CloudFront data transfer, and Route 53 if you use it. ACM public certificates are free.</p>
+        </div>
+
+        <h2 id="steps">Steps<a class="anchor" href="#steps" aria-label="Link to this section">#</a></h2>
+        <ol class="steps">
+          <li>
+            <h3>Get your own copy of the repository</h3>
+            <p>Fork <a href="https://github.com/mohamedaminehamdi/vibecoded-deployer">mohamedaminehamdi/vibecoded-deployer</a> (or clone it and push it to a new repository) <strong>into the GitHub account or organization that owns your Lovable repositories</strong>.</p>
+            <p>Workflows do not run on a fresh fork until you allow them: open the <strong>Actions</strong> tab and enable workflows. Forks also do not inherit secrets, so you add your own in step 3.</p>
+          </li>
+          <li>
+            <h3>Create the Terraform state bucket (one time)</h3>
+            <p>S3 bucket names are global, so the default <code>lovable-deployer-terraform-state</code> is almost certainly taken. Pick your own name:</p>
+<pre><code>cd terraform/bootstrap
+terraform init
+terraform apply -var="state_bucket_name=&lt;your-unique-bucket-name&gt;"</code></pre>
+            <p>This creates one bucket with versioning, AES256 encryption and all public access blocked. Keep the bootstrap's local state file and do not migrate it into the bucket it created.</p>
+            <p>You do not need to create <code>backend.tf</code> or migrate state for the workflows; they generate <code>backend.tf</code> on every run.</p>
+          </li>
+          <li>
+            <h3>Add repository secrets</h3>
+            <p>In <strong>Settings, Secrets and variables, Actions</strong>, add the secrets you need. Minimum for Route 53: the two AWS keys, plus <code>TERRAFORM_STATE_BUCKET</code> if you did not use the default bucket name.</p>
+<pre><code>gh secret set AWS_ACCESS_KEY_ID
+gh secret set AWS_SECRET_ACCESS_KEY
+# only if your state bucket name is not the default:
+gh secret set TERRAFORM_STATE_BUCKET</code></pre>
+            <p>The <code>gh</code> commands are optional; the web UI does the same thing. For GoDaddy also add <code>GODADDY_API_KEY</code> and <code>GODADDY_API_SECRET</code>. The full list is in the <a href="reference.html#secrets">secrets reference</a>.</p>
+          </li>
+          <li>
+            <h3>Run the Deploy Lovable Website workflow</h3>
+            <p>Open <strong>Actions, Deploy Lovable Website, Run workflow</strong> and fill in the form (see the <a href="reference.html#deploy-inputs">inputs reference</a>):</p>
+            <ul>
+              <li><code>repo_name</code>: <code>my-lovable-site</code></li>
+              <li><code>domain_name</code>: <code>example.com</code></li>
+              <li><code>subdomain</code>: <code>my-site</code></li>
+              <li><code>dns_provider</code>: <code>route53</code> (the form lists <code>godaddy</code> first, so check it)</li>
+            </ul>
+            <p>Or from the command line:</p>
+<pre><code>gh workflow run deploy-lovable-website.yml \
+  -f repo_name=my-lovable-site \
+  -f domain_name=example.com \
+  -f subdomain=my-site \
+  -f dns_provider=route53</code></pre>
+          </li>
+          <li>
+            <h3>Open your site</h3>
+            <p>The run summary ends with <code>Website URL: https://my-site.example.com</code>. A first deployment includes certificate validation and CloudFront propagation, so allow several minutes. The Terraform apply step has a 20 minute timeout. The CNAME has a TTL of 600 seconds, so DNS may take a little longer to be visible everywhere.</p>
+            <div class="callout warn">
+              <p class="callout-title">Using GoDaddy?</p>
+              <p>Expect the first run to need a manual certificate validation step and a second run. See the <a href="dns.html#godaddy">GoDaddy flow</a>.</p>
+            </div>
+          </li>
+        </ol>
+
+        <h2 id="first-run">What happens on a first run<a class="anchor" href="#first-run" aria-label="Link to this section">#</a></h2>
+        <ol>
+          <li>The workflow looks for the bucket <code>&lt;subdomain&gt;.&lt;domain_name&gt;</code> and a CloudFront distribution that uses it. Neither exists, so it runs the full flow.</li>
+          <li>For Route 53 it looks up the hosted zone named <code>domain_name</code>.</li>
+          <li>It writes <code>terraform/backend.tf</code> pointing at <code>projects/&lt;repo_name&gt;/terraform.tfstate</code> in your state bucket, then runs <code>terraform init</code>, <code>refresh</code> and <code>apply</code>.</li>
+          <li>It checks out your Lovable repo, runs <code>npm ci</code> and <code>npm run build</code>, and finds the output directory.</li>
+          <li>It runs <code>aws s3 sync --delete</code> into the bucket and invalidates <code>/*</code> in CloudFront.</li>
+          <li>It creates the CNAME at your DNS provider and writes a summary.</li>
+        </ol>
+
+        <h2 id="next">Next steps<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+        <ul>
+          <li>Change code in the Lovable repo, then <a href="teardown.html#redeploy">redeploy</a> with the same inputs.</li>
+          <li>Understand <a href="architecture.html">what was created</a>.</li>
+          <li>Something failed? Try <a href="troubleshooting.html">troubleshooting</a>.</li>
+        </ul>
+
+        <p><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/edit/main/docs/quickstart.html">Edit this page on GitHub</a></p>
+        <nav class="pager" aria-label="Pages"><a class="next" href="architecture.html"><small>Next</small>Architecture</a></nav>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>MIT licensed. Documentation for <a href="https://github.com/mohamedaminehamdi/vibecoded-deployer">mohamedaminehamdi/vibecoded-deployer</a>.</p>
+      <ul>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/SECURITY.md">Security</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/issues">Issues</a></li>
+      </ul>
+    </div>
+  </footer>
+  <script src="assets/site.js" defer></script>
+</body>
+</html>

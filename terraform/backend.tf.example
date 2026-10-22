@@ -1,0 +1,24 @@
+# Example Terraform backend configuration.
+#
+# You only need this when running Terraform on your own machine (for example to
+# read a site's outputs). The deploy and destroy workflows generate their own
+# backend.tf on every run, so you do not need to create one for them.
+#
+# To use it:
+#   1. Create the state bucket with terraform/bootstrap.
+#   2. Copy this file to backend.tf (which is git-ignored).
+#   3. Set bucket to your state bucket and key to projects/<repo_name>/terraform.tfstate.
+#   4. Run: terraform init -reconfigure
+#      (use -migrate-state instead if you already have local state to move)
+#
+# use_lockfile (S3 native locking) requires Terraform 1.10 or newer.
+
+terraform {
+  backend "s3" {
+    bucket       = "lovable-deployer-terraform-state"       # your state bucket (the default name is almost certainly taken; use your own)
+    key          = "projects/your-repo-name/terraform.tfstate" # one key per deployed project
+    region       = "us-west-2"                              # the workflows hard-code us-west-2
+    encrypt      = true
+    use_lockfile = true
+  }
+}

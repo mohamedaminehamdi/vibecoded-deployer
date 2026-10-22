@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Architecture · vibecoded-deployer</title>
+  <meta name="description" content="What vibecoded-deployer creates in AWS, how the deploy workflow decides what to do, and where state lives.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("ld-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}</script>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M16 21V10m0 0-5 5m5-5 5 5M9.5 25h13" fill="none" stroke="var(--accent-contrast)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>vibecoded-deployer</span></a>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+          <a href="quickstart.html">Quickstart</a>
+          <a href="architecture.html" aria-current="page">Architecture</a>
+          <a href="reference.html">Reference</a>
+          <a href="dns.html">DNS</a>
+          <a href="teardown.html">Teardown</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="Dark mode" aria-pressed="false"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/mohamedaminehamdi/vibecoded-deployer" aria-label="vibecoded-deployer on GitHub"><svg class="filled" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <button class="icon-btn menu-btn" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      </div>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container doc">
+      <div class="toc-col"><nav class="toc" aria-labelledby="toc-title"><p class="toc-title" id="toc-title">On this page</p><ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#resources">What gets created</a></li>
+<li><a href="#decision">How a run decides what to do</a></li>
+<li><a href="#state">Terraform state</a></li>
+<li><a href="#design">Design choices to be aware of</a></li>
+</ul></nav></div>
+      <article class="doc-main">
+        <h1>Architecture</h1>
+        <p class="page-lede">What gets created, how a run decides what to do, and the design choices you inherit.</p>
+        <h2 id="overview">Overview<a class="anchor" href="#overview" aria-label="Link to this section">#</a></h2>
+        <figure class="diagram">
+  <div class="diagram-scroll" tabindex="0" role="region" aria-label="Architecture diagram (scrolls horizontally on small screens)">
+    <svg viewBox="0 0 980 510" role="img" aria-labelledby="dg-title dg-desc">
+      <title id="dg-title">vibecoded-deployer architecture</title>
+      <desc id="dg-desc">You run a GitHub Actions workflow. It checks for existing infrastructure, applies Terraform to create an S3 bucket, an ACM certificate and a CloudFront distribution in your AWS account, builds your Lovable repository, syncs the build to S3, invalidates the CloudFront cache and writes a CNAME at Route 53 or GoDaddy. Visitors resolve the name through DNS and reach CloudFront, which serves the files from S3.</desc>
+      <defs>
+        <marker id="dg-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path class="dg-head" d="M0 0 L10 5 L0 10 z"/>
+        </marker>
+      </defs>
+
+      <!-- Left column -->
+      <rect class="dg-node" x="20" y="38" width="150" height="58" rx="10"/>
+      <text class="dg-title" x="95" y="62" text-anchor="middle">You</text>
+      <text class="dg-sub" x="95" y="80" text-anchor="middle">Run workflow form</text>
+
+      <rect class="dg-node" x="20" y="214" width="150" height="58" rx="10"/>
+      <text class="dg-title" x="95" y="238" text-anchor="middle">Lovable repo</text>
+      <text class="dg-sub" x="95" y="256" text-anchor="middle">same GitHub owner</text>
+
+      <rect class="dg-node" x="20" y="428" width="150" height="58" rx="10"/>
+      <text class="dg-title" x="95" y="452" text-anchor="middle">Visitor</text>
+      <text class="dg-sub" x="95" y="470" text-anchor="middle">browser</text>
+
+      <!-- GitHub Actions panel -->
+      <rect class="dg-panel" x="240" y="20" width="232" height="298" rx="14"/>
+      <text class="dg-title" x="256" y="46">GitHub Actions</text>
+      <text class="dg-sub" x="256" y="64">Deploy Lovable Website</text>
+
+      <rect class="dg-step" x="254" y="80" width="204" height="34" rx="8"/>
+      <text class="dg-text" x="268" y="102"><tspan class="dg-num">1</tspan>  Check for existing infra</text>
+      <rect class="dg-step" x="254" y="120" width="204" height="34" rx="8"/>
+      <text class="dg-text" x="268" y="142"><tspan class="dg-num">2</tspan>  Terraform apply</text>
+      <rect class="dg-step" x="254" y="160" width="204" height="34" rx="8"/>
+      <text class="dg-text" x="268" y="182"><tspan class="dg-num">3</tspan>  Build Lovable app</text>
+      <rect class="dg-step" x="254" y="200" width="204" height="34" rx="8"/>
+      <text class="dg-text" x="268" y="222"><tspan class="dg-num">4</tspan>  Sync to S3, invalidate</text>
+      <rect class="dg-step" x="254" y="240" width="204" height="34" rx="8"/>
+      <text class="dg-text" x="268" y="262"><tspan class="dg-num">5</tspan>  Create DNS CNAME</text>
+      <text class="dg-label" x="256" y="300">steps 2 and 5 skipped on redeploy</text>
+
+      <!-- DNS -->
+      <rect class="dg-node is-accent" x="240" y="428" width="232" height="58" rx="10"/>
+      <text class="dg-title" x="356" y="452" text-anchor="middle">Route 53 or GoDaddy</text>
+      <text class="dg-sub" x="356" y="470" text-anchor="middle">CNAME  sub.example.com</text>
+
+      <!-- AWS account -->
+      <rect class="dg-aws" x="560" y="20" width="400" height="388" rx="16"/>
+      <text class="dg-title" x="578" y="46">Your AWS account</text>
+
+      <rect class="dg-node is-dashed" x="584" y="66" width="352" height="58" rx="10"/>
+      <text class="dg-title" x="600" y="90">S3 state bucket</text>
+      <text class="dg-sub" x="600" y="108">created once by terraform/bootstrap</text>
+
+      <rect class="dg-node" x="584" y="164" width="352" height="64" rx="10"/>
+      <text class="dg-title" x="600" y="190">S3 bucket</text>
+      <text class="dg-sub" x="600" y="209">static website endpoint, us-west-2</text>
+
+      <rect class="dg-node is-accent" x="584" y="290" width="170" height="64" rx="10"/>
+      <text class="dg-title" x="600" y="316">CloudFront</text>
+      <text class="dg-sub" x="600" y="335">HTTPS, SPA fallback</text>
+
+      <rect class="dg-node" x="780" y="290" width="156" height="64" rx="10"/>
+      <text class="dg-title" x="796" y="316">ACM certificate</text>
+      <text class="dg-sub" x="796" y="335">us-east-1</text>
+
+      <!-- Arrows -->
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M170 67 H240"/>
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M170 243 H240"/>
+      <text class="dg-label" x="205" y="236" text-anchor="middle">checkout</text>
+
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M458 128 H500 V95 H584"/>
+      <text class="dg-label" x="512" y="88">state</text>
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M458 146 H560"/>
+      <text class="dg-label" x="466" y="164">terraform apply</text>
+
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M458 210 H584"/>
+      <text class="dg-label" x="470" y="203">s3 sync</text>
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M458 226 H500 V322 H584"/>
+      <text class="dg-label" x="505" y="313">invalidate</text>
+
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M356 318 V428"/>
+      <text class="dg-label" x="366" y="380">API / CLI</text>
+
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M170 457 H240"/>
+      <text class="dg-label" x="205" y="450" text-anchor="middle">resolve</text>
+
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M472 457 H669 V354"/>
+      <text class="dg-label" x="560" y="450">CNAME target</text>
+
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M669 290 V228"/>
+      <text class="dg-label" x="679" y="262">origin (HTTP)</text>
+
+      <path class="dg-arrow" marker-end="url(#dg-arrowhead)" d="M780 322 H754"/>
+    </svg>
+  </div>
+  <figcaption>Provisioning and publishing run from GitHub Actions. At request time, visitors resolve the name through your DNS provider, connect to CloudFront over HTTPS, and CloudFront fetches files from the S3 website endpoint.</figcaption>
+</figure>
+
+        <p>Everything runs in your own GitHub repository and AWS account. The <strong>deploy</strong> workflow provisions infrastructure with Terraform, builds your Lovable repository, uploads the build and creates the DNS record. At request time only DNS, CloudFront, ACM and S3 are involved; GitHub Actions is not in the request path.</p>
+
+        <h2 id="resources">What gets created<a class="anchor" href="#resources" aria-label="Link to this section">#</a></h2>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Terraform resources by module (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Terraform resources by module</caption>
+          <thead><tr><th scope="col">Resource</th><th scope="col">Module</th><th scope="col">Notes</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">S3 bucket</th><td><code>s3</code></td><td>Named <code>&lt;subdomain&gt;.&lt;domain_name&gt;</code>, in <code>us-west-2</code>. Static website configuration with <code>index.html</code> as index and error document.</td></tr>
+            <tr><th scope="row">S3 public access block</th><td><code>s3</code></td><td>All four settings set to <code>false</code>, so a public bucket policy is allowed.</td></tr>
+            <tr><th scope="row">S3 bucket policy</th><td><code>s3</code></td><td>Allows anyone (<code>Principal: *</code>) to <code>s3:GetObject</code> on every object.</td></tr>
+            <tr><th scope="row">ACM certificate</th><td><code>acm</code></td><td>For <code>&lt;subdomain&gt;.&lt;domain_name&gt;</code>, DNS validation, in <code>us-east-1</code> (required by CloudFront).</td></tr>
+            <tr><th scope="row">Route 53 validation records</th><td><code>acm</code></td><td>Only when a hosted zone ID is passed (the Route 53 flow). TTL 60, overwrite allowed.</td></tr>
+            <tr><th scope="row">ACM certificate validation</th><td><code>acm</code></td><td>Only with a hosted zone ID. Terraform waits here until the certificate is issued.</td></tr>
+            <tr><th scope="row">CloudFront distribution</th><td><code>cloudfront</code></td><td>S3 website endpoint as a custom origin over HTTP, the site alias and ACM certificate, redirect to HTTPS, compression, IPv6, default root object <code>index.html</code>, 403 and 404 answered with <code>/index.html</code> and status 200.</td></tr>
+          </tbody>
+        </table></div>
+        <p>The workflow also creates the DNS CNAME with the AWS CLI (Route 53) or the GoDaddy API. That record is not managed by Terraform.</p>
+
+        <h2 id="decision">How a run decides what to do<a class="anchor" href="#decision" aria-label="Link to this section">#</a></h2>
+        <p>The first step of the deploy workflow checks whether the bucket <code>&lt;subdomain&gt;.&lt;domain_name&gt;</code> exists, and if so looks for a CloudFront distribution that has an origin whose domain name contains the bucket name.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Deploy mode by existing infrastructure (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Deploy mode by existing infrastructure</caption>
+          <thead><tr><th scope="col">Bucket</th><th scope="col">Distribution</th><th scope="col"><code>force_infrastructure</code></th><th scope="col">Mode</th><th scope="col">Terraform and DNS steps</th></tr></thead>
+          <tbody>
+            <tr><td>exists</td><td>found</td><td>false</td><td>Redeploy</td><td>skipped</td></tr>
+            <tr><td>exists</td><td>found</td><td>true</td><td>Full</td><td>run</td></tr>
+            <tr><td>exists</td><td>not found</td><td>any</td><td>Full</td><td>run</td></tr>
+            <tr><td>missing</td><td>not checked</td><td>any</td><td>Full</td><td>run</td></tr>
+          </tbody>
+        </table></div>
+        <p>The build and upload steps always run. In order, a <strong>full</strong> run does this:</p>
+        <ol>
+          <li>Looks up the Route 53 hosted zone ID (Route 53 only; the run fails if no zone is found).</li>
+          <li>Writes <code>terraform/backend.tf</code> for the project's state key, then <code>terraform init -reconfigure</code>.</li>
+          <li>Runs <code>terraform refresh</code> (failures ignored) and <code>terraform apply -auto-approve</code> (failures do not fail the job; 20 minute timeout).</li>
+          <li>Prints the key Terraform outputs, and the certificate validation records when the certificate needs manual validation. Both only happen when the apply succeeded.</li>
+          <li>Re-applies the bucket's public access block, website configuration and bucket policy with the AWS CLI (failures ignored).</li>
+          <li>Checks out your Lovable repo, runs <code>npm ci</code> and <code>npm run build</code> and picks the first of <code>out</code>, <code>build</code>, <code>dist</code> that exists.</li>
+          <li>Runs <code>aws s3 sync --delete</code> and creates a CloudFront invalidation for <code>/*</code> (failure ignored).</li>
+          <li>Reads the CloudFront domain from Terraform (falling back to the bucket's S3 website endpoint if that is empty) and writes the CNAME at your DNS provider.</li>
+        </ol>
+        <p>A <strong>redeploy</strong> skips steps 1 to 5 and 8, and takes the distribution ID from the first check.</p>
+        <div class="callout warn">
+          <p class="callout-title">Check the logs</p>
+          <p>Because the Terraform apply step is <code>continue-on-error</code> and the final summary text is fixed, a green run does not prove that every resource was created. If <strong>Verify Infrastructure</strong> was skipped, the apply failed.</p>
+        </div>
+
+        <h2 id="state">Terraform state<a class="anchor" href="#state" aria-label="Link to this section">#</a></h2>
+        <ul>
+          <li><strong>Where:</strong> <code>s3://&lt;state bucket&gt;/projects/&lt;repo_name&gt;/terraform.tfstate</code>, in <code>us-west-2</code>, encrypted. The state bucket is the one you created with <code>terraform/bootstrap</code>; its name comes from the <code>TERRAFORM_STATE_BUCKET</code> secret or defaults to <code>lovable-deployer-terraform-state</code>.</li>
+          <li><strong>Locking:</strong> S3 native lock file (<code>use_lockfile = true</code>), no DynamoDB.</li>
+          <li><strong>Backend config:</strong> generated by the workflows on every run and never committed (<code>terraform/backend.tf</code> is git-ignored).</li>
+          <li><strong>Isolation:</strong> one state per <code>repo_name</code>.</li>
+        </ul>
+        <div class="callout danger">
+          <p class="callout-title">One deployment per repo_name</p>
+          <p>The state key does not include the domain or subdomain. Deploying the same <code>repo_name</code> to a second subdomain would make Terraform compare the new variables against the first deployment's state and plan changes to those resources. Treat <code>repo_name</code> as the identity of a deployment.</p>
+        </div>
+
+        <h2 id="design">Design choices to be aware of<a class="anchor" href="#design" aria-label="Link to this section">#</a></h2>
+        <ul>
+          <li><strong>Public bucket, HTTP origin.</strong> CloudFront fetches from the S3 <em>website endpoint</em> over HTTP, so the bucket must be publicly readable. Anyone who knows the bucket's website endpoint can read the files without CloudFront. There is no origin access control.</li>
+          <li><strong>Single-page-app routing.</strong> Missing paths return <code>index.html</code> with status 200, both from S3's error document and from CloudFront's custom error responses for 403 and 404. Deep links work, but real 404s are never reported.</li>
+          <li><strong>Caching.</strong> CloudFront's default TTL is one hour (minimum 0, maximum 24 hours). The workflow invalidates <code>/*</code> after every deployment so changes appear quickly.</li>
+          <li><strong>Certificate region.</strong> CloudFront only accepts certificates from <code>us-east-1</code>, so Terraform uses a second AWS provider alias for ACM.</li>
+          <li><strong>Provider and region choices are hard-coded.</strong> See the <a href="reference.html#fixed-values">fixed values</a>.</li>
+        </ul>
+
+        <p><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/edit/main/docs/architecture.html">Edit this page on GitHub</a></p>
+        <nav class="pager" aria-label="Pages"><a class="prev" href="quickstart.html"><small>Previous</small>Quickstart</a><a class="next" href="reference.html"><small>Next</small>Reference</a></nav>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>MIT licensed. Documentation for <a href="https://github.com/mohamedaminehamdi/vibecoded-deployer">mohamedaminehamdi/vibecoded-deployer</a>.</p>
+      <ul>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/SECURITY.md">Security</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/issues">Issues</a></li>
+      </ul>
+    </div>
+  </footer>
+  <script src="assets/site.js" defer></script>
+</body>
+</html>

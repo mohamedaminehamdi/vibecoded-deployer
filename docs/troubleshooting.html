@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Troubleshooting, FAQ and limitations · vibecoded-deployer</title>
+  <meta name="description" content="Fixes for common deploy and destroy errors, answers to frequent questions, and the known limitations.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("ld-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}</script>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M16 21V10m0 0-5 5m5-5 5 5M9.5 25h13" fill="none" stroke="var(--accent-contrast)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>vibecoded-deployer</span></a>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+          <a href="quickstart.html">Quickstart</a>
+          <a href="architecture.html">Architecture</a>
+          <a href="reference.html">Reference</a>
+          <a href="dns.html">DNS</a>
+          <a href="teardown.html">Teardown</a>
+          <a href="troubleshooting.html" aria-current="page">Troubleshooting</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="Dark mode" aria-pressed="false"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/mohamedaminehamdi/vibecoded-deployer" aria-label="vibecoded-deployer on GitHub"><svg class="filled" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <button class="icon-btn menu-btn" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      </div>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container doc">
+      <div class="toc-col"><nav class="toc" aria-labelledby="toc-title"><p class="toc-title" id="toc-title">On this page</p><ul>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#faq">FAQ</a></li>
+<li><a href="#limitations">Limitations</a></li>
+</ul></nav></div>
+      <article class="doc-main">
+        <h1>Troubleshooting, FAQ and limitations</h1>
+        <p class="page-lede">Symptoms, causes and fixes, followed by the questions people ask most and the limits you should know about.</p>
+        <p>Open the failing run in the <strong>Actions</strong> tab and expand the step that is red (or the one that should have run). Several steps are <code>continue-on-error</code>, so a green job can still hide a failed step.</p>
+
+        <h2 id="troubleshooting">Troubleshooting<a class="anchor" href="#troubleshooting" aria-label="Link to this section">#</a></h2>
+
+        <h3 id="ts-before">Before and during Terraform<a class="anchor" href="#ts-before" aria-label="Link to this section">#</a></h3>
+        <details class="qa">
+          <summary>Could not find Route 53 hosted zone for &lt;domain&gt;</summary>
+          <div class="qa-body">
+            <p>The workflow found no hosted zone named exactly <code>domain_name</code> in the AWS account behind your keys. Create the zone, or check for a typo, an extra subdomain label in <code>domain_name</code>, or credentials from a different account. If your DNS is at GoDaddy, use <code>dns_provider = godaddy</code> instead.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Terraform init fails: bucket does not exist or access denied</summary>
+          <div class="qa-body">
+            <p>Check, in this order:</p>
+            <ul>
+              <li>Did you run <code>terraform/bootstrap</code>?</li>
+              <li>Does the bucket name match the <code>TERRAFORM_STATE_BUCKET</code> secret, or the default <code>lovable-deployer-terraform-state</code> when the secret is not set?</li>
+              <li>Is the bucket in <code>us-west-2</code>? The workflows hard-code that region for the backend.</li>
+              <li>Can your IAM user list the bucket and read, write and delete objects in it (the lock file included)?</li>
+            </ul>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Error acquiring the state lock</summary>
+          <div class="qa-body">
+            <p>A cancelled or crashed run can leave a lock file (<code>terraform.tfstate.tflock</code>) next to the state object. Make sure no other run is active, then run <code>terraform force-unlock &lt;LOCK_ID&gt;</code> with the project's backend configuration, or delete the lock object from the state bucket.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Unsupported argument "use_lockfile" (running Terraform locally)</summary>
+          <div class="qa-body">
+            <p>S3 native locking needs Terraform 1.10 or newer. The workflows install the latest Terraform, so this only affects your own machine.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>The job is green but the site does not load</summary>
+          <div class="qa-body">
+            <p>The Terraform apply step is <code>continue-on-error</code>. Open its log. If <strong>Verify Infrastructure</strong> was skipped, the apply failed and no CloudFront distribution may exist. The final summary text is fixed and does not prove success.</p>
+            <p>With GoDaddy this is expected on the first run; see the <a href="dns.html#godaddy">GoDaddy flow</a>.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Terraform apply times out after 20 minutes (Route 53)</summary>
+          <div class="qa-body">
+            <p>With Route 53, Terraform waits for ACM to issue the certificate. That never happens if the hosted zone is not the one your domain's nameservers point to. Compare the zone's NS records with the nameservers set at your registrar, then run the workflow again.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>BucketAlreadyExists</summary>
+          <div class="qa-body">
+            <p>S3 bucket names are global. <code>&lt;subdomain&gt;.&lt;domain_name&gt;</code> is already used, probably in another AWS account. Choose a different subdomain.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>AccessDenied when applying the bucket policy</summary>
+          <div class="qa-body">
+            <p>The site bucket is public by design. If S3 Block Public Access is enabled at the AWS <em>account</em> level (or by an organization policy), attaching a public bucket policy is rejected. Adjust that setting for this account if a public static site is what you want.</p>
+          </div>
+        </details>
+
+        <h3 id="ts-build">Build and upload<a class="anchor" href="#ts-build" aria-label="Link to this section">#</a></h3>
+        <details class="qa">
+          <summary>Repository not found when checking out the Lovable repo</summary>
+          <div class="qa-body">
+            <p>The workflow checks out <code>&lt;owner of this repo&gt;/&lt;repo_name&gt;</code>. Check the spelling of <code>repo_name</code> and that the Lovable repo belongs to the same owner. If it is private, add an <code>ACCESS_GITHUB_TOKEN</code> secret with read access to that repository's contents.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>npm ci fails</summary>
+          <div class="qa-body">
+            <p><code>npm ci</code> needs a committed <code>package-lock.json</code> that matches <code>package.json</code>. Run <code>npm install</code> locally and commit the updated lock file.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>The build fails, but works on my machine</summary>
+          <div class="qa-body">
+            <p>The workflow builds with Node.js 18. If a dependency needs a newer Node.js, change <code>node-version</code> in the <strong>Setup Node</strong> step of the deploy workflow.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Could not find build output directory</summary>
+          <div class="qa-body">
+            <p><code>npm run build</code> must produce <code>out/</code>, <code>build/</code> or <code>dist/</code> in the repository root; the first one found is used.</p>
+          </div>
+        </details>
+
+        <h3 id="ts-after">After a deployment<a class="anchor" href="#ts-after" aria-label="Link to this section">#</a></h3>
+        <details class="qa">
+          <summary>I still see the old version</summary>
+          <div class="qa-body">
+            <p>The invalidation step is <code>continue-on-error</code>; check that it ran. CloudFront's default TTL here is one hour and browsers cache too, so try a hard refresh or a private window.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>The name does not resolve, or it resolves to the wrong place</summary>
+          <div class="qa-body">
+            <p>Allow for propagation (TTL 600 seconds). Make sure the provider you selected is the one your nameservers point to; the CNAME is written there and nowhere else. Check with <code>dig +short &lt;subdomain&gt;.&lt;domain_name&gt; CNAME</code>. It should return a <code>*.cloudfront.net</code> name.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Browser shows a certificate warning</summary>
+          <div class="qa-body">
+            <p>The name may still point at the S3 website endpoint (the fallback used when Terraform produced no CloudFront domain), which has no certificate. Fix the Terraform failure and run the workflow again; see the <a href="dns.html#godaddy">GoDaddy flow</a> if you use GoDaddy.</p>
+          </div>
+        </details>
+
+        <h3 id="ts-destroy">Destroy<a class="anchor" href="#ts-destroy" aria-label="Link to this section">#</a></h3>
+        <details class="qa">
+          <summary>The destroy job was skipped</summary>
+          <div class="qa-body">
+            <p><code>confirm_destroy</code> must be exactly <code>DESTROY</code>, in capitals.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Destroy fails because the bucket is not empty</summary>
+          <div class="qa-body">
+            <p>The emptying step makes one <code>delete-objects</code> call, which AWS limits to 1000 keys, and ignores its failure. Empty the bucket yourself (for example with <code>aws s3 rm s3://&lt;bucket&gt; --recursive</code>), then run destroy again.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>The summary says "No state found", but my DNS record disappeared</summary>
+          <div class="qa-body">
+            <p>The DNS deletion steps do not depend on the state check. A mistyped <code>repo_name</code> with a correct domain and subdomain leaves AWS resources untouched but still deletes the CNAME. Re-create it by running the deploy workflow with <code>force_infrastructure</code> set to <code>true</code>, and re-run destroy with the right <code>repo_name</code>.</p>
+          </div>
+        </details>
+
+        <h2 id="faq">FAQ<a class="anchor" href="#faq" aria-label="Link to this section">#</a></h2>
+        <details class="qa">
+          <summary>Does it only work with Lovable?</summary>
+          <div class="qa-body">
+            <p>It is built for Lovable-generated React repositories, but the workflow only requires that <code>npm ci</code> and <code>npm run build</code> succeed and produce static files in <code>out/</code>, <code>build/</code> or <code>dist/</code>.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Can I deploy to the apex domain or add a www redirect?</summary>
+          <div class="qa-body">
+            <p>No. <code>subdomain</code> is required, and the certificate, bucket and CloudFront alias are all <code>&lt;subdomain&gt;.&lt;domain_name&gt;</code>.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Can I host several sites?</summary>
+          <div class="qa-body">
+            <p>Yes. Run the workflow once per Lovable repo with its own <code>repo_name</code> and <code>subdomain</code>. All of them share one state bucket and keep separate state files.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Can I deploy one repo to staging and production?</summary>
+          <div class="qa-body">
+            <p>Not safely. The state key contains only <code>repo_name</code>, so a second subdomain for the same repo would be planned against the first deployment's state. Use separate repositories (for example a fork per environment).</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>Can I use a private Lovable repo?</summary>
+          <div class="qa-body">
+            <p>Yes, with an <code>ACCESS_GITHUB_TOKEN</code> secret that can read it. It must still belong to the same owner as your copy of this repository.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>How do I change the region or the Node.js version?</summary>
+          <div class="qa-body">
+            <p>Edit them in the code: <code>us-west-2</code> appears in both workflows, <code>terraform/main.tf</code> and <code>terraform/bootstrap/variables.tf</code>; Node.js 18 is set in the deploy workflow. The certificate must stay in <code>us-east-1</code>. See the <a href="reference.html#fixed-values">fixed values</a>.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>How do I roll out an updated version of this repository to an existing site?</summary>
+          <div class="qa-body">
+            <p>Merge or pull the changes into your copy, then run the deploy workflow with <code>force_infrastructure</code> set to <code>true</code>. Terraform applies the difference against the existing state. Read the changelog first, and consider running <code>terraform plan</code> locally against the project's state.</p>
+          </div>
+        </details>
+        <details class="qa">
+          <summary>What does it cost?</summary>
+          <div class="qa-body">
+            <p>AWS charges for S3 storage and requests, CloudFront data transfer and requests, and Route 53 if you use it. ACM public certificates are free.</p>
+          </div>
+        </details>
+
+        <h2 id="limitations">Limitations<a class="anchor" href="#limitations" aria-label="Link to this section">#</a></h2>
+        <ul>
+          <li><strong>One deployment per <code>repo_name</code>.</strong> The state key has no domain or subdomain in it.</li>
+          <li><strong>Subdomains only.</strong> No apex domain, no <code>www</code> redirect.</li>
+          <li><strong>Same GitHub owner,</strong> default branch only. There is no branch or tag input.</li>
+          <li><strong>Static output only,</strong> built with <code>npm ci</code> and <code>npm run build</code> on Node.js 18.</li>
+          <li><strong>The bucket is public,</strong> and CloudFront reaches it over HTTP via the S3 website endpoint, without origin access control. Do not host private content.</li>
+          <li><strong>Fixed regions:</strong> <code>us-west-2</code>, plus <code>us-east-1</code> for the certificate.</li>
+          <li><strong>Long-lived AWS keys.</strong> No GitHub OIDC support.</li>
+          <li><strong>GoDaddy certificate validation is manual,</strong> so a first GoDaddy deployment takes two runs.</li>
+          <li><strong>Failures can be quiet.</strong> Terraform apply and cache invalidation are <code>continue-on-error</code>, and the run summary text is fixed.</li>
+          <li><strong>Very large sites.</strong> Teardown empties the bucket with one <code>delete-objects</code> call, which handles at most 1000 keys.</li>
+          <li><strong>No automated end-to-end tests.</strong> CI checks Terraform formatting and validity and workflow syntax only.</li>
+        </ul>
+
+        <p><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/edit/main/docs/troubleshooting.html">Edit this page on GitHub</a></p>
+        <nav class="pager" aria-label="Pages"><a class="prev" href="teardown.html"><small>Previous</small>Teardown</a></nav>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>MIT licensed. Documentation for <a href="https://github.com/mohamedaminehamdi/vibecoded-deployer">mohamedaminehamdi/vibecoded-deployer</a>.</p>
+      <ul>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/SECURITY.md">Security</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/issues">Issues</a></li>
+      </ul>
+    </div>
+  </footer>
+  <script src="assets/site.js" defer></script>
+</body>
+</html>

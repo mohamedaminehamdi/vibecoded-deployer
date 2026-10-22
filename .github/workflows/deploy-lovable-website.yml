@@ -1,0 +1,422 @@
+name: Deploy Lovable Website
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_name:
+        description: "Name of the Lovable GitHub repo (must belong to the same owner as this repo), e.g. my-lovable-site"
+        required: true
+        type: string
+      domain_name:
+        description: "Root domain, e.g. example.com"
+        required: true
+        type: string
+      subdomain:
+        description: "Subdomain to publish on, e.g. my-site (serves my-site.example.com)"
+        required: true
+        type: string
+      dns_provider:
+        description: "DNS provider that hosts the domain (godaddy or route53)"
+        required: true
+        type: choice
+        options:
+          - godaddy
+          - route53
+      force_infrastructure:
+        description: "Run Terraform even if the S3 bucket and CloudFront distribution already exist"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout deployer repo
+      uses: actions/checkout@v4
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_wrapper: false
+
+    - name: Configure AWS credentials for Terraform
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+
+    - name: Check if infrastructure exists
+      id: check-infra
+      run: |
+        BUCKET_NAME="${{ inputs.subdomain }}.${{ inputs.domain_name }}"
+        
+        BUCKET_EXISTS=false
+        CLOUDFRONT_EXISTS=false
+        CLOUDFRONT_ID=""
+        CLOUDFRONT_DOMAIN=""
+        
+        # Check if S3 bucket exists
+        if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+          echo "✅ S3 bucket exists: $BUCKET_NAME"
+          BUCKET_EXISTS=true
+          echo "bucket_exists=true" >> $GITHUB_OUTPUT
+          
+          # Try to find CloudFront distribution for this bucket
+          # Look for distributions with origins containing the bucket name or website endpoint
+          CLOUDFRONT_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Origins.Items[?contains(DomainName, '$BUCKET_NAME')]].Id" \
+            --output text 2>/dev/null | head -1 || echo "")
+          
+          if [ -n "$CLOUDFRONT_ID" ]; then
+            echo "✅ CloudFront distribution found: $CLOUDFRONT_ID"
+            CLOUDFRONT_EXISTS=true
+            echo "cloudfront_exists=true" >> $GITHUB_OUTPUT
+            echo "cloudfront_id=$CLOUDFRONT_ID" >> $GITHUB_OUTPUT
+            
+            # Get CloudFront domain name
+            CLOUDFRONT_DOMAIN=$(aws cloudfront get-distribution --id "$CLOUDFRONT_ID" \
+              --query "Distribution.DomainName" --output text 2>/dev/null || echo "")
+            echo "cloudfront_domain=$CLOUDFRONT_DOMAIN" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ CloudFront distribution not found for bucket: $BUCKET_NAME"
+            echo "cloudfront_exists=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "📦 S3 bucket does not exist: $BUCKET_NAME"
+          echo "bucket_exists=false" >> $GITHUB_OUTPUT
+          echo "cloudfront_exists=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Determine if we should skip Terraform
+        # REQUIRE BOTH bucket AND CloudFront to exist before skipping Terraform
+        if [ "${{ inputs.force_infrastructure }}" == "true" ]; then
+          echo "🔄 Force infrastructure flag set - will run full Terraform"
+          echo "skip_terraform=false" >> $GITHUB_OUTPUT
+        elif [ "$BUCKET_EXISTS" = "true" ] && [ "$CLOUDFRONT_EXISTS" = "true" ]; then
+          echo "🚀 Complete infrastructure exists (S3 + CloudFront) - will skip Terraform and only rebuild/upload"
+          echo "skip_terraform=true" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ Incomplete infrastructure detected:"
+          echo "   - Bucket exists: $BUCKET_EXISTS"
+          echo "   - CloudFront exists: $CLOUDFRONT_EXISTS"
+          echo "📦 Will run full Terraform to ensure complete infrastructure"
+          echo "skip_terraform=false" >> $GITHUB_OUTPUT
+        fi
+
+    # ==================== INFRASTRUCTURE SETUP (skipped if exists) ====================
+    
+    - name: Get Route 53 Hosted Zone ID
+      if: inputs.dns_provider == 'route53' && steps.check-infra.outputs.skip_terraform != 'true'
+      id: get-zone-id
+      run: |
+        echo "Looking up Route 53 hosted zone for ${{ inputs.domain_name }}..."
+        ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+          --dns-name "${{ inputs.domain_name }}" \
+          --query "HostedZones[?Name=='${{ inputs.domain_name }}.'].Id" \
+          --output text | cut -d'/' -f3)
+        if [ -z "$ZONE_ID" ]; then
+          echo "Error: Could not find Route 53 hosted zone for ${{ inputs.domain_name }}"
+          echo "Make sure you have a hosted zone created in Route 53 for this domain"
+          exit 1
+        fi
+        echo "Found hosted zone: $ZONE_ID"
+        echo "zone_id=$ZONE_ID" >> $GITHUB_OUTPUT
+
+    - name: Configure Terraform Backend for Project
+      if: steps.check-infra.outputs.skip_terraform != 'true'
+      working-directory: terraform
+      run: |
+        # Create backend configuration with project-specific state key
+        cat > backend.tf <<EOF
+        terraform {
+          backend "s3" {
+            bucket       = "${{ secrets.TERRAFORM_STATE_BUCKET || 'lovable-deployer-terraform-state' }}"
+            key          = "projects/${{ inputs.repo_name }}/terraform.tfstate"
+            region       = "us-west-2"
+            encrypt      = true
+            use_lockfile = true
+          }
+        }
+        EOF
+        cat backend.tf
+
+    - name: Terraform Init
+      if: steps.check-infra.outputs.skip_terraform != 'true'
+      working-directory: terraform
+      run: terraform init -reconfigure
+
+    - name: Terraform Refresh (sync state with actual resources)
+      if: steps.check-infra.outputs.skip_terraform != 'true'
+      working-directory: terraform
+      continue-on-error: true
+      run: |
+        # Get zone ID (will be empty if not using Route 53)
+        ZONE_ID="${{ steps.get-zone-id.outputs.zone_id }}"
+        
+        terraform refresh \
+          -var="bucket_name=${{ inputs.subdomain }}.${{ inputs.domain_name }}" \
+          -var="domain_name=${{ inputs.domain_name }}" \
+          -var="subdomain=${{ inputs.subdomain }}" \
+          -var="route53_hosted_zone_id=${ZONE_ID}" || true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: us-west-2
+
+    - name: Terraform Apply (S3, ACM & CloudFront)
+      if: steps.check-infra.outputs.skip_terraform != 'true'
+      working-directory: terraform
+      continue-on-error: true
+      timeout-minutes: 20
+      id: terraform
+      run: |
+        # Get zone ID (will be empty if not using Route 53)
+        ZONE_ID="${{ steps.get-zone-id.outputs.zone_id }}"
+        echo "Using Route 53 Zone ID: ${ZONE_ID:-'(not set - using GoDaddy or manual validation)'}"
+        
+        terraform apply -auto-approve \
+          -var="bucket_name=${{ inputs.subdomain }}.${{ inputs.domain_name }}" \
+          -var="domain_name=${{ inputs.domain_name }}" \
+          -var="subdomain=${{ inputs.subdomain }}" \
+          -var="route53_hosted_zone_id=${ZONE_ID}"
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: us-west-2
+
+    - name: Verify Infrastructure
+      if: steps.check-infra.outputs.skip_terraform != 'true' && steps.terraform.outcome == 'success'
+      working-directory: terraform
+      run: |
+        echo "=== Infrastructure Verification ==="
+        echo "S3 Bucket: $(terraform output -raw bucket_name 2>/dev/null || echo 'NOT SET')"
+        echo "S3 Website Endpoint: $(terraform output -raw s3_website_endpoint 2>/dev/null || echo 'NOT SET')"
+        echo "CloudFront Domain: $(terraform output -raw cloudfront_domain_name 2>/dev/null || echo 'NOT SET')"
+        echo "CloudFront Distribution ID: $(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo 'NOT SET')"
+        echo "Certificate ARN: $(terraform output -raw certificate_arn 2>/dev/null || echo 'NOT SET')"
+        echo "Certificate Status: $(terraform output -raw certificate_validation_status 2>/dev/null || echo 'NOT SET')"
+
+    - name: Get Certificate Validation Records (if needed)
+      if: steps.check-infra.outputs.skip_terraform != 'true' && steps.terraform.outcome == 'success'
+      working-directory: terraform
+      id: cert-validation
+      run: |
+        VALIDATION_STATUS=$(terraform output -raw certificate_validation_status 2>/dev/null || echo "pending")
+        if [ "$VALIDATION_STATUS" = "pending_manual_validation" ]; then
+          echo "Certificate requires manual DNS validation"
+          terraform output -json certificate_validation_records > /tmp/validation_records.json || true
+          cat /tmp/validation_records.json || echo "No validation records found"
+        fi
+
+    - name: Ensure S3 bucket configuration
+      if: steps.check-infra.outputs.skip_terraform != 'true'
+      run: |
+        BUCKET_NAME="${{ inputs.subdomain }}.${{ inputs.domain_name }}"
+        
+        # Wait a moment for bucket to be fully created if it was just created
+        sleep 2
+        
+        # Ensure public access block is configured (allow public access)
+        aws s3api put-public-access-block \
+          --bucket "$BUCKET_NAME" \
+          --region us-west-2 \
+          --public-access-block-configuration \
+          "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false" || true
+        
+        # Ensure website configuration exists
+        aws s3api put-bucket-website \
+          --bucket "$BUCKET_NAME" \
+          --region us-west-2 \
+          --website-configuration '{
+            "IndexDocument": {"Suffix": "index.html"},
+            "ErrorDocument": {"Key": "index.html"}
+          }' || true
+        
+        # Ensure bucket policy allows public read
+        aws s3api put-bucket-policy \
+          --bucket "$BUCKET_NAME" \
+          --region us-west-2 \
+          --policy "{
+            \"Version\": \"2012-10-17\",
+            \"Statement\": [{
+              \"Effect\": \"Allow\",
+              \"Principal\": \"*\",
+              \"Action\": [\"s3:GetObject\"],
+              \"Resource\": \"arn:aws:s3:::$BUCKET_NAME/*\"
+            }]
+          }" || true
+    
+    # ==================== BUILD AND UPLOAD (always runs) ====================
+
+    - name: Checkout Lovable Repo
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository_owner }}/${{ inputs.repo_name }}
+        path: lovable-app
+        token: ${{ secrets.ACCESS_GITHUB_TOKEN || github.token }}
+
+    - name: Install dependencies
+      working-directory: lovable-app
+      run: npm ci
+
+    - name: Build React app
+      working-directory: lovable-app
+      run: npm run build
+
+    - name: Detect build output directory
+      id: detect-build-dir
+      working-directory: lovable-app
+      run: |
+        if [ -d "out" ]; then
+          BUILD_DIR="out"
+        elif [ -d "build" ]; then
+          BUILD_DIR="build"
+        elif [ -d "dist" ]; then
+          BUILD_DIR="dist"
+        else
+          echo "Error: Could not find build output directory (checked: out, build, dist)"
+          ls -la
+          exit 1
+        fi
+        echo "build_dir=$BUILD_DIR" >> $GITHUB_OUTPUT
+        echo "Using build directory: $BUILD_DIR"
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+
+    - name: Upload to S3
+      run: |
+        aws s3 sync lovable-app/${{ steps.detect-build-dir.outputs.build_dir }}/ \
+        s3://${{ inputs.subdomain }}.${{ inputs.domain_name }} \
+        --delete
+
+    - name: Invalidate CloudFront Cache
+      continue-on-error: true
+      run: |
+        # Get CloudFront ID from either check-infra (redeploy) or terraform output (new deploy)
+        if [ "${{ steps.check-infra.outputs.skip_terraform }}" == "true" ]; then
+          CLOUDFRONT_ID="${{ steps.check-infra.outputs.cloudfront_id }}"
+        else
+          cd terraform
+          CLOUDFRONT_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "")
+        fi
+        
+        if [ -n "$CLOUDFRONT_ID" ]; then
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_ID" \
+            --paths "/*"
+          echo "✅ CloudFront cache invalidation initiated for: $CLOUDFRONT_ID"
+        else
+          echo "⚠️ CloudFront distribution ID not found, skipping cache invalidation"
+        fi
+
+    - name: Get CloudFront Domain for DNS
+      if: steps.check-infra.outputs.skip_terraform != 'true'
+      id: get-cloudfront-domain
+      working-directory: terraform
+      run: |
+        CLOUDFRONT_DOMAIN=$(terraform output -raw cloudfront_domain_name 2>/dev/null || echo "")
+        if [ -z "$CLOUDFRONT_DOMAIN" ]; then
+          # Fallback to S3 endpoint if CloudFront not available
+          CLOUDFRONT_DOMAIN="${{ inputs.subdomain }}.${{ inputs.domain_name }}.s3-website-us-west-2.amazonaws.com"
+        fi
+        echo "domain=$CLOUDFRONT_DOMAIN" >> $GITHUB_OUTPUT
+        echo "Using domain for DNS: $CLOUDFRONT_DOMAIN"
+
+    # ==================== DNS SETUP (only for new infrastructure) ====================
+    
+    - name: Create GoDaddy Subdomain (CNAME to CloudFront)
+      if: inputs.dns_provider == 'godaddy' && steps.check-infra.outputs.skip_terraform != 'true'
+      run: |
+        CLOUDFRONT_DOMAIN="${{ steps.get-cloudfront-domain.outputs.domain }}"
+        curl -X PUT "https://api.godaddy.com/v1/domains/${{ inputs.domain_name }}/records/CNAME/${{ inputs.subdomain }}" \
+        -H "Authorization: sso-key ${{ secrets.GODADDY_API_KEY }}:${{ secrets.GODADDY_API_SECRET }}" \
+        -H "Content-Type: application/json" \
+        -d "[{
+          \"data\": \"$CLOUDFRONT_DOMAIN\",
+          \"ttl\": 600
+        }]"
+        echo "Created CNAME record: ${{ inputs.subdomain }}.${{ inputs.domain_name }} -> $CLOUDFRONT_DOMAIN"
+
+    - name: Create Route 53 CNAME Record
+      if: inputs.dns_provider == 'route53' && steps.check-infra.outputs.skip_terraform != 'true'
+      run: |
+        ZONE_ID="${{ steps.get-zone-id.outputs.zone_id }}"
+        
+        if [ -z "$ZONE_ID" ]; then
+          echo "Error: Route 53 Zone ID is empty. The zone lookup step may have failed."
+          exit 1
+        fi
+        
+        CLOUDFRONT_DOMAIN="${{ steps.get-cloudfront-domain.outputs.domain }}"
+        
+        if [ -z "$CLOUDFRONT_DOMAIN" ]; then
+          echo "Error: CloudFront domain is empty. Terraform may have failed."
+          exit 1
+        fi
+        
+        CHANGE_BATCH=$(cat <<EOF
+        {
+          "Changes": [{
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "${{ inputs.subdomain }}.${{ inputs.domain_name }}",
+              "Type": "CNAME",
+              "TTL": 600,
+              "ResourceRecords": [{
+                "Value": "$CLOUDFRONT_DOMAIN"
+              }]
+            }
+          }]
+        }
+        EOF
+        )
+        
+        CHANGE_ID=$(aws route53 change-resource-record-sets \
+          --hosted-zone-id "$ZONE_ID" \
+          --change-batch "$CHANGE_BATCH" \
+          --query 'ChangeInfo.Id' \
+          --output text)
+        
+        echo "Route 53 record change submitted: $CHANGE_ID"
+
+    # ==================== SUMMARY ====================
+    
+    - name: Deployment Summary
+      run: |
+        echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.check-infra.outputs.skip_terraform }}" == "true" ]; then
+          echo "**Mode:** ♻️ Redeploy (infrastructure already exists)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Actions performed:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Built React application" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Uploaded to S3 bucket" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Invalidated CloudFront cache" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "**Mode:** 🆕 Full deployment (new infrastructure)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Actions performed:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Created S3 bucket with static hosting" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Provisioned ACM certificate" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Created CloudFront distribution" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Configured DNS (${{ inputs.dns_provider }})" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Built and uploaded React application" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Website URL:** https://${{ inputs.subdomain }}.${{ inputs.domain_name }}" >> $GITHUB_STEP_SUMMARY
+

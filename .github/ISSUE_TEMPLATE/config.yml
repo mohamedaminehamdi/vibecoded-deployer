@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/mohamedaminehamdi/vibecoded-deployer/security/advisories/new
+    about: Please report vulnerabilities privately. Do not open a public issue.
+  - name: Troubleshooting guide
+    url: https://mohamedaminehamdi.github.io/vibecoded-deployer/troubleshooting.html
+    about: Common errors from the deploy and destroy workflows, with fixes.

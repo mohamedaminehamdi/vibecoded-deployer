@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reference · vibecoded-deployer</title>
+  <meta name="description" content="Workflow inputs, repository secrets, Terraform variables and outputs, fixed values and AWS permissions.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("ld-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}</script>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M16 21V10m0 0-5 5m5-5 5 5M9.5 25h13" fill="none" stroke="var(--accent-contrast)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>vibecoded-deployer</span></a>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+          <a href="quickstart.html">Quickstart</a>
+          <a href="architecture.html">Architecture</a>
+          <a href="reference.html" aria-current="page">Reference</a>
+          <a href="dns.html">DNS</a>
+          <a href="teardown.html">Teardown</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="Dark mode" aria-pressed="false"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/mohamedaminehamdi/vibecoded-deployer" aria-label="vibecoded-deployer on GitHub"><svg class="filled" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <button class="icon-btn menu-btn" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      </div>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container doc">
+      <div class="toc-col"><nav class="toc" aria-labelledby="toc-title"><p class="toc-title" id="toc-title">On this page</p><ul>
+<li><a href="#deploy-inputs">Deploy workflow inputs</a></li>
+<li><a href="#destroy-inputs">Destroy workflow inputs</a></li>
+<li><a href="#secrets">Repository secrets</a></li>
+<li><a href="#fixed-values">Values that are fixed in the code</a></li>
+<li><a href="#terraform">Terraform variables and outputs</a></li>
+<li><a href="#permissions">AWS permissions</a></li>
+</ul></nav></div>
+      <article class="doc-main">
+        <h1>Reference</h1>
+        <p class="page-lede">Every input, secret and hard-coded value, taken from the workflows and Terraform in the repository.</p>
+        <h2 id="deploy-inputs">Deploy workflow inputs<a class="anchor" href="#deploy-inputs" aria-label="Link to this section">#</a></h2>
+        <p>Workflow <strong>Deploy Lovable Website</strong> (<code>.github/workflows/deploy-lovable-website.yml</code>), trigger <code>workflow_dispatch</code>.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Deploy workflow inputs (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Deploy workflow inputs</caption>
+          <thead><tr><th scope="col">Input</th><th scope="col">Type</th><th scope="col">Required</th><th scope="col">Default</th><th scope="col">Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>repo_name</code></th><td>string</td><td>yes</td><td></td><td>Name of the Lovable repository, without the owner. Checked out from <code>&lt;owner of this repo&gt;/&lt;repo_name&gt;</code> at its default branch. Also names the Terraform state key <code>projects/&lt;repo_name&gt;/terraform.tfstate</code>.</td></tr>
+            <tr><th scope="row"><code>domain_name</code></th><td>string</td><td>yes</td><td></td><td>Root domain, for example <code>example.com</code>. For Route 53 it must exactly match the name of a hosted zone in your AWS account.</td></tr>
+            <tr><th scope="row"><code>subdomain</code></th><td>string</td><td>yes</td><td></td><td>Label to publish on. The site is served at <code>&lt;subdomain&gt;.&lt;domain_name&gt;</code>; the same string is the S3 bucket name and the certificate name. Apex domains are not supported.</td></tr>
+            <tr><th scope="row"><code>dns_provider</code></th><td>choice</td><td>yes</td><td>none</td><td><code>godaddy</code> or <code>route53</code>. The form lists <code>godaddy</code> first, so double-check your selection.</td></tr>
+            <tr><th scope="row"><code>force_infrastructure</code></th><td>boolean</td><td>no</td><td><code>false</code></td><td>Run the Terraform and DNS steps even when the bucket and the CloudFront distribution already exist. Terraform applies whatever differs from its state; nothing is recreated unless Terraform decides to.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h2 id="destroy-inputs">Destroy workflow inputs<a class="anchor" href="#destroy-inputs" aria-label="Link to this section">#</a></h2>
+        <p>Workflow <strong>Destroy Lovable Website</strong> (<code>.github/workflows/destroy-lovable-website.yml</code>), trigger <code>workflow_dispatch</code>.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Destroy workflow inputs (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Destroy workflow inputs</caption>
+          <thead><tr><th scope="col">Input</th><th scope="col">Type</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>repo_name</code></th><td>string</td><td>yes</td><td>The <code>repo_name</code> used at deploy time. Selects the Terraform state to destroy.</td></tr>
+            <tr><th scope="row"><code>domain_name</code></th><td>string</td><td>yes</td><td>Root domain, as used at deploy time.</td></tr>
+            <tr><th scope="row"><code>subdomain</code></th><td>string</td><td>yes</td><td>Subdomain, as used at deploy time.</td></tr>
+            <tr><th scope="row"><code>confirm_destroy</code></th><td>string</td><td>yes</td><td>Must be exactly <code>DESTROY</code> (case sensitive). With any other value the job is skipped.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h2 id="secrets">Repository secrets<a class="anchor" href="#secrets" aria-label="Link to this section">#</a></h2>
+        <p>Add them under <strong>Settings, Secrets and variables, Actions, Repository secrets</strong>.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Repository secrets (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Repository secrets</caption>
+          <thead><tr><th scope="col">Secret</th><th scope="col">Required</th><th scope="col">Used by</th><th scope="col">Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>AWS_ACCESS_KEY_ID</code></th><td>always</td><td>deploy, destroy</td><td>Access key ID of the IAM user the workflows run as.</td></tr>
+            <tr><th scope="row"><code>AWS_SECRET_ACCESS_KEY</code></th><td>always</td><td>deploy, destroy</td><td>Matching secret access key.</td></tr>
+            <tr><th scope="row"><code>GODADDY_API_KEY</code></th><td>when <code>dns_provider</code> is <code>godaddy</code></td><td>deploy; destroy (optional)</td><td>GoDaddy API key. In the destroy workflow, if this secret is set the workflow also tries to delete the GoDaddy CNAME.</td></tr>
+            <tr><th scope="row"><code>GODADDY_API_SECRET</code></th><td>when <code>dns_provider</code> is <code>godaddy</code></td><td>deploy, destroy</td><td>GoDaddy API secret.</td></tr>
+            <tr><th scope="row"><code>ACCESS_GITHUB_TOKEN</code></th><td>only for Lovable repos the default token cannot read</td><td>deploy</td><td>Personal access token with read access to the Lovable repository contents. If unset, the built-in <code>github.token</code> is used.</td></tr>
+            <tr><th scope="row"><code>TERRAFORM_STATE_BUCKET</code></th><td>only if your state bucket is not named <code>lovable-deployer-terraform-state</code></td><td>deploy, destroy</td><td>Name of the S3 bucket created by the bootstrap.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h2 id="fixed-values">Values that are fixed in the code<a class="anchor" href="#fixed-values" aria-label="Link to this section">#</a></h2>
+        <p>These are hard-coded. Changing them means editing the workflows and Terraform.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Hard-coded values (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Hard-coded values</caption>
+          <thead><tr><th scope="col">Value</th><th scope="col">Where</th></tr></thead>
+          <tbody>
+            <tr><td>AWS region <code>us-west-2</code> for the S3 bucket, the Terraform backend and all AWS CLI calls</td><td>both workflows, <code>terraform/main.tf</code>, <code>terraform/bootstrap/variables.tf</code></td></tr>
+            <tr><td>AWS region <code>us-east-1</code> for the ACM certificate (a CloudFront requirement)</td><td><code>terraform/main.tf</code></td></tr>
+            <tr><td>Node.js 18 for the build</td><td>deploy workflow</td></tr>
+            <tr><td>Terraform: the latest release, installed by <code>hashicorp/setup-terraform</code></td><td>both workflows</td></tr>
+            <tr><td>AWS provider <code>~&gt; 5.0</code></td><td><code>terraform/main.tf</code>, <code>terraform/bootstrap/main.tf</code>, <code>terraform/modules/acm/versions.tf</code></td></tr>
+            <tr><td>CNAME record TTL 600 seconds; certificate validation record TTL 60 seconds</td><td>deploy workflow, <code>terraform/modules/acm/main.tf</code></td></tr>
+            <tr><td>CloudFront: IPv6 on, SNI-only, minimum TLS <code>TLSv1.2_2021</code>, redirect to HTTPS, compression on, TTL min 0 / default 3600 / max 86400 seconds, no query strings or cookies forwarded</td><td><code>terraform/modules/cloudfront/main.tf</code></td></tr>
+            <tr><td>Cache invalidation path <code>/*</code> after every deploy</td><td>deploy workflow</td></tr>
+            <tr><td>Build output directory search order: <code>out</code>, <code>build</code>, <code>dist</code></td><td>deploy workflow</td></tr>
+          </tbody>
+        </table></div>
+
+        <h2 id="terraform">Terraform variables and outputs<a class="anchor" href="#terraform" aria-label="Link to this section">#</a></h2>
+        <p>The workflows pass the variables with <code>-var</code> flags. You only need these if you run Terraform yourself.</p>
+        <h3 id="tf-variables">Root module (<code>terraform/</code>) variables<a class="anchor" href="#tf-variables" aria-label="Link to this section">#</a></h3>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Root module variables (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Root module variables</caption>
+          <thead><tr><th scope="col">Variable</th><th scope="col">Default</th><th scope="col">Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>bucket_name</code></th><td>required</td><td>Name of the S3 bucket. The workflows pass <code>&lt;subdomain&gt;.&lt;domain_name&gt;</code>.</td></tr>
+            <tr><th scope="row"><code>domain_name</code></th><td>required</td><td>Root domain name.</td></tr>
+            <tr><th scope="row"><code>subdomain</code></th><td>required</td><td>Subdomain label.</td></tr>
+            <tr><th scope="row"><code>route53_hosted_zone_id</code></th><td><code>""</code></td><td>Hosted zone ID used to create validation records and wait for the certificate. Empty means manual validation (GoDaddy flow). The workflows fill it in automatically for Route 53 and pass an empty value when destroying.</td></tr>
+          </tbody>
+        </table></div>
+        <h3 id="tf-outputs">Root module outputs<a class="anchor" href="#tf-outputs" aria-label="Link to this section">#</a></h3>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Root module outputs (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Root module outputs</caption>
+          <thead><tr><th scope="col">Output</th><th scope="col">Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>bucket_name</code></th><td>Name of the S3 bucket.</td></tr>
+            <tr><th scope="row"><code>s3_website_endpoint</code></th><td>S3 website endpoint, used as the CloudFront origin.</td></tr>
+            <tr><th scope="row"><code>cloudfront_domain_name</code></th><td>Domain of the distribution; the target of the CNAME.</td></tr>
+            <tr><th scope="row"><code>cloudfront_distribution_id</code></th><td>Distribution ID, used for invalidations.</td></tr>
+            <tr><th scope="row"><code>cloudfront_hosted_zone_id</code></th><td>CloudFront's Route 53 zone ID.</td></tr>
+            <tr><th scope="row"><code>certificate_arn</code></th><td>ARN of the ACM certificate.</td></tr>
+            <tr><th scope="row"><code>certificate_validation_records</code></th><td>DNS records to create for manual validation. Empty when a hosted zone ID was supplied.</td></tr>
+            <tr><th scope="row"><code>certificate_validation_status</code></th><td><code>validated</code>, <code>pending</code> or <code>pending_manual_validation</code>.</td></tr>
+          </tbody>
+        </table></div>
+        <h3 id="tf-bootstrap">Bootstrap (<code>terraform/bootstrap/</code>)<a class="anchor" href="#tf-bootstrap" aria-label="Link to this section">#</a></h3>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Bootstrap variables and outputs (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">Bootstrap variables and outputs</caption>
+          <thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Default</th><th scope="col">Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>state_bucket_name</code></th><td>variable</td><td><code>lovable-deployer-terraform-state</code></td><td>State bucket name. Must be globally unique, so override it.</td></tr>
+            <tr><th scope="row"><code>aws_region</code></th><td>variable</td><td><code>us-west-2</code></td><td>Region of the bucket. The workflows hard-code <code>us-west-2</code>.</td></tr>
+            <tr><th scope="row"><code>s3_bucket_name</code>, <code>s3_bucket_arn</code></th><td>output</td><td></td><td>Name and ARN of the state bucket.</td></tr>
+            <tr><th scope="row"><code>next_steps</code></th><td>output</td><td></td><td>A text hint about configuring a local backend. Not needed when you only use the workflows.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h2 id="permissions">AWS permissions<a class="anchor" href="#permissions" aria-label="Link to this section">#</a></h2>
+        <p>The IAM user behind <code>AWS_ACCESS_KEY_ID</code> must be able to do everything below. This repository does not ship a tested minimal IAM policy; build one from this list and try it with a throwaway domain before relying on it.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="AWS calls made by the workflows (scrolls horizontally if needed)"><table>
+          <caption class="sr-only">AWS calls made by the workflows</caption>
+          <thead><tr><th scope="col">Service</th><th scope="col">Calls made directly by the workflows</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">S3</th><td><code>head-bucket</code>, <code>put-public-access-block</code>, <code>put-bucket-website</code>, <code>put-bucket-policy</code>, <code>sync</code> (list, put, delete objects); on destroy <code>list-object-versions</code>, <code>delete-objects</code> and <code>rm</code> for the state file</td></tr>
+            <tr><th scope="row">CloudFront</th><td><code>list-distributions</code>, <code>get-distribution</code>, <code>create-invalidation</code>, <code>wait distribution-deployed</code></td></tr>
+            <tr><th scope="row">ACM (<code>us-east-1</code>)</th><td><code>delete-certificate</code> (destroy)</td></tr>
+            <tr><th scope="row">Route 53</th><td><code>list-hosted-zones-by-name</code>, <code>list-resource-record-sets</code>, <code>change-resource-record-sets</code></td></tr>
+          </tbody>
+        </table></div>
+        <p>On top of that, Terraform (AWS provider 5.x) needs create, read, update and delete rights on the S3 bucket and its sub-resources, the ACM certificate and its validation, the CloudFront distribution, and the Route 53 validation records, plus read and write access to the state object and its lock file in the state bucket.</p>
+        <div class="callout warn">
+          <p class="callout-title">Credentials</p>
+          <p>The workflows use long-lived access keys. They do not support GitHub OIDC. Use a dedicated IAM user, scope it as tightly as you can and rotate the keys.</p>
+        </div>
+
+        <p><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/edit/main/docs/reference.html">Edit this page on GitHub</a></p>
+        <nav class="pager" aria-label="Pages"><a class="prev" href="architecture.html"><small>Previous</small>Architecture</a><a class="next" href="dns.html"><small>Next</small>DNS</a></nav>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>MIT licensed. Documentation for <a href="https://github.com/mohamedaminehamdi/vibecoded-deployer">mohamedaminehamdi/vibecoded-deployer</a>.</p>
+      <ul>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/blob/main/SECURITY.md">Security</a></li>
+        <li><a href="https://github.com/mohamedaminehamdi/vibecoded-deployer/issues">Issues</a></li>
+      </ul>
+    </div>
+  </footer>
+  <script src="assets/site.js" defer></script>
+</body>
+</html>
