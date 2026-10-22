@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Redesigned the documentation site: a dark, technical look with a looping replay of a deploy run on the home page (stage names and log lines taken from the deploy workflow), flowing arrows in the architecture diagrams, terminal-style code blocks, and a reading-progress line. A header button pauses all animation, and the OS "reduce motion" setting turns it off by default; with motion off the home page shows its finished state. Oxanium and JetBrains Mono are now self-hosted in `docs/assets/fonts/` under the SIL Open Font License 1.1, so the site still makes no external requests.
 - Renamed the project to `vibecoded-deployer`. The default Terraform state bucket name (`lovable-deployer-terraform-state`) is unchanged so that existing setups keep working.
 - Rewrote `README.md`: architecture, prerequisites, quickstart, full input and secret reference, the Route 53 and GoDaddy flows, teardown, troubleshooting and known limitations.
 - Corrected the setup documentation (`README.md`, `terraform/bootstrap/README.md`, `terraform/backend.tf.example`): the workflows write `backend.tf` themselves, so no state migration is needed for them, and the default state bucket name is unlikely to be available because S3 bucket names are global.
