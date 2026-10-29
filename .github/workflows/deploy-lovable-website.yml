@@ -34,20 +34,20 @@ jobs:
 
     steps:
     - name: Checkout deployer repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Setup Node
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: 18
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      uses: hashicorp/setup-terraform@v4
       with:
         terraform_wrapper: false
 
     - name: Configure AWS credentials for Terraform
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -257,7 +257,7 @@ jobs:
     # ==================== BUILD AND UPLOAD (always runs) ====================
 
     - name: Checkout Lovable Repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         repository: ${{ github.repository_owner }}/${{ inputs.repo_name }}
         path: lovable-app
@@ -290,7 +290,7 @@ jobs:
         echo "Using build directory: $BUILD_DIR"
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
